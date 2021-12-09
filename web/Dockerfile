@@ -1,13 +1,6 @@
 FROM ubuntu:20.10
 RUN apt update
-#RUN apt install -y curl gnupg2
 RUN apt install -y curl
-
-#RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add -
-#RUN echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list
-
-#RUN apt update
-#RUN apt install -y yarn
 
 # Install npm / Node
 ENV NODE_VERSION=14.17.5
