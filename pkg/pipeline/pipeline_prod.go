@@ -105,8 +105,6 @@ func newPipeline(input *InputBin, output *OutputBin) (*Pipeline, error) {
 		}
 	}
 
-	pipeline.DebugBinToDotFile(gst.DebugGraphShowAll, "linked_pipeline_graph")
-
 	return &Pipeline{
 		pipeline: pipeline,
 		output:   output,
