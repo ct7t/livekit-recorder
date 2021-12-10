@@ -31,7 +31,7 @@ func NewRtmpPipeline(urls []string, options *livekit.RecordingOptions) (*Pipelin
 		initialized = true
 	}
 
-	input, err := newInputBin(true, options)
+	input, err := newInputBin(true, false, options)
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +49,7 @@ func NewFilePipeline(filename string, options *livekit.RecordingOptions) (*Pipel
 		initialized = true
 	}
 
-	input, err := newInputBin(false, options)
+	input, err := newInputBin(false, strings.HasSuffix(filename, ".m3u8"), options)
 	if err != nil {
 		return nil, err
 	}
@@ -82,9 +82,30 @@ func newPipeline(input *InputBin, output *OutputBin) (*Pipeline, error) {
 	}
 
 	// link bins
-	if err = input.bin.Link(output.bin.Element); err != nil {
-		return nil, err
+	if output.isPlaylist {
+		inputPads, err := input.bin.GetSrcPads()
+		if err != nil {
+			return nil, err
+		}
+		outputPads, err := output.bin.GetSinkPads()
+		if err != nil {
+			return nil, err
+		}
+
+		for i := range inputPads {
+			for o := range outputPads {
+				if inputPads[i].GetName() == outputPads[o].GetName() {
+					inputPads[i].Link(outputPads[o])
+				}
+			}
+		}
+	} else {
+		if err = input.bin.Link(output.bin.Element); err != nil {
+			return nil, err
+		}
 	}
+
+	pipeline.DebugBinToDotFile(gst.DebugGraphShowAll, "linked_pipeline_graph")
 
 	return &Pipeline{
 		pipeline: pipeline,

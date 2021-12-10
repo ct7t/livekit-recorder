@@ -4,6 +4,7 @@ package pipeline
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/livekit/protocol/logger"
 	"github.com/livekit/protocol/utils"
@@ -11,8 +12,9 @@ import (
 )
 
 type OutputBin struct {
-	isStream bool
-	bin      *gst.Bin
+	isStream   bool
+	isPlaylist bool
+	bin        *gst.Bin
 
 	// file only
 	fileSink *gst.Element
@@ -29,16 +31,47 @@ type RtmpOut struct {
 }
 
 func newFileOutputBin(filename string) (*OutputBin, error) {
+	var sink *gst.Element
+	var err error
+	isPlaylist := strings.HasSuffix(filename, ".m3u8")
+
 	// create elements
-	sink, err := gst.NewElement("filesink")
-	if err != nil {
-		return nil, err
-	}
-	if err = sink.SetProperty("location", filename); err != nil {
-		return nil, err
-	}
-	if err = sink.SetProperty("sync", false); err != nil {
-		return nil, err
+	if isPlaylist {
+		sink, err = gst.NewElement("hlssink2")
+		if err != nil {
+			return nil, err
+		}
+		err = sink.SetProperty("playlist-location", filename)
+		if err != nil {
+			return nil, err
+		}
+		err = sink.SetProperty("location", strings.TrimSuffix(filename, ".m3u8")+"_%08d.ts")
+		if err != nil {
+			return nil, err
+		}
+		err = sink.SetProperty("target-duration", uint(2))
+		if err != nil {
+			return nil, err
+		}
+		err = sink.SetProperty("max-files", uint(0))
+		if err != nil {
+			return nil, err
+		}
+		err = sink.SetProperty("playlist-length", uint(0))
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		sink, err = gst.NewElement("filesink")
+		if err != nil {
+			return nil, err
+		}
+		if err = sink.SetProperty("location", filename); err != nil {
+			return nil, err
+		}
+		if err = sink.SetProperty("sync", false); err != nil {
+			return nil, err
+		}
 	}
 
 	// create bin
@@ -47,16 +80,34 @@ func newFileOutputBin(filename string) (*OutputBin, error) {
 		return nil, err
 	}
 
-	// add ghost pad
-	ghostPad := gst.NewGhostPad("sink", sink.GetStaticPad("sink"))
-	if !bin.AddPad(ghostPad.Pad) {
-		return nil, ErrGhostPadFailed
+	// add ghost pad(s)
+	if isPlaylist {
+		videoPad := sink.GetRequestPad("video")
+		audioPad := sink.GetRequestPad("audio")
+
+		sink.AddPad(videoPad)
+		sink.AddPad(audioPad)
+
+		videoGhostPad := gst.NewGhostPad("video", videoPad)
+		if !bin.AddPad(videoGhostPad.Pad) {
+			return nil, ErrGhostPadFailed
+		}
+		audioGhostPad := gst.NewGhostPad("audio", audioPad)
+		if !bin.AddPad(audioGhostPad.Pad) {
+			return nil, ErrGhostPadFailed
+		}
+	} else {
+		ghostPad := gst.NewGhostPad("sink", sink.GetStaticPad("sink"))
+		if !bin.AddPad(ghostPad.Pad) {
+			return nil, ErrGhostPadFailed
+		}
 	}
 
 	return &OutputBin{
-		isStream: false,
-		bin:      bin,
-		fileSink: sink,
+		isStream:   false,
+		isPlaylist: strings.HasSuffix(filename, ".m3u8"),
+		bin:        bin,
+		fileSink:   sink,
 	}, nil
 }
 
@@ -93,10 +144,11 @@ func newRtmpOutputBin(urls []string) (*OutputBin, error) {
 	}
 
 	return &OutputBin{
-		isStream: true,
-		bin:      bin,
-		tee:      tee,
-		rtmp:     rtmpOut,
+		isStream:   true,
+		isPlaylist: false,
+		bin:        bin,
+		tee:        tee,
+		rtmp:       rtmpOut,
 	}, nil
 }
 
