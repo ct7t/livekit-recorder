@@ -76,7 +76,6 @@ const renderStage: React.FC<StageProps> = ({ roomState }: StageProps) => {
           width="100%"
           height="100%"
           orientation="landscape"
-          displayName={remoteParticipants[0].identity}
           showOverlay
         />
         {audioRenderers}
@@ -101,7 +100,6 @@ const renderStage: React.FC<StageProps> = ({ roomState }: StageProps) => {
         height="100%"
         orientation="landscape"
         quality={VideoQuality.HIGH}
-        displayName={remoteParticipants[0].identity}
         showOverlay
       />
     );
@@ -119,7 +117,6 @@ const renderStage: React.FC<StageProps> = ({ roomState }: StageProps) => {
             height="100%"
             orientation="landscape"
             adaptiveVideo
-            displayName={participant.identity}
             showOverlay
           />
         ))}

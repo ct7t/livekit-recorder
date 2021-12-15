@@ -126,7 +126,6 @@ const renderStage: React.FC<StageProps> = ({ roomState }: StageProps) => {
           height="100%"
           adaptiveVideo
           showOverlay
-          displayName={participant.identity}
         />
       ))}
       {audioRenderers}
