@@ -17,7 +17,7 @@ import (
 var (
 	ErrNoOutput        = errors.New("output file, s3 path, or rtmp urls required")
 	ErrInvalidUrl      = errors.New("invalid rtmp url")
-	ErrInvalidFilePath = errors.New("file output must be {path/}filename.mp4")
+	ErrInvalidFilePath = errors.New("file output must be {path/}filename.[mp4|m3u8]")
 	ErrNoInput         = errors.New("input url or template required")
 )
 
@@ -44,7 +44,7 @@ func (r *Recorder) Validate(req *livekit.StartRecordingRequest) error {
 		}
 	case *livekit.StartRecordingRequest_Filepath:
 		filepath := req.Output.(*livekit.StartRecordingRequest_Filepath).Filepath
-		if !strings.HasSuffix(filepath, ".mp4") {
+		if !strings.HasSuffix(filepath, ".mp4") && !strings.HasSuffix(filepath, ".m3u8") {
 			return ErrInvalidFilePath
 		}
 

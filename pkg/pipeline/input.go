@@ -12,6 +12,7 @@ import (
 
 type InputBin struct {
 	isStream      bool
+	isPlaylist    bool
 	bin           *gst.Bin
 	audioElements []*gst.Element
 	videoElements []*gst.Element
@@ -20,7 +21,7 @@ type InputBin struct {
 	mux           *gst.Element
 }
 
-func newInputBin(isStream bool, options *livekit.RecordingOptions) (*InputBin, error) {
+func newInputBin(isStream bool, isPlaylist bool, options *livekit.RecordingOptions) (*InputBin, error) {
 	// create audio elements
 	pulseSrc, err := gst.NewElement("pulsesrc")
 	if err != nil {
@@ -117,23 +118,25 @@ func newInputBin(isStream bool, options *livekit.RecordingOptions) (*InputBin, e
 
 	// create mux
 	var mux *gst.Element
-	if isStream {
-		mux, err = gst.NewElement("flvmux")
-		if err != nil {
-			return nil, err
-		}
-		err = mux.Set("streamable", true)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		mux, err = gst.NewElement("mp4mux")
-		if err != nil {
-			return nil, err
-		}
-		err = mux.SetProperty("faststart", true)
-		if err != nil {
-			return nil, err
+	if !isPlaylist {
+		if isStream {
+			mux, err = gst.NewElement("flvmux")
+			if err != nil {
+				return nil, err
+			}
+			err = mux.Set("streamable", true)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			mux, err = gst.NewElement("mp4mux")
+			if err != nil {
+				return nil, err
+			}
+			err = mux.SetProperty("faststart", true)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -144,21 +147,43 @@ func newInputBin(isStream bool, options *livekit.RecordingOptions) (*InputBin, e
 		pulseSrc, audioConvert, audioCapsFilter, faac, audioQueue,
 		// video
 		xImageSrc, videoConvert, framerateCaps, x264Enc, profileCaps, videoQueue,
-		// mux
-		mux,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	// create ghost pad
-	ghostPad := gst.NewGhostPad("src", mux.GetStaticPad("src"))
-	if !bin.AddPad(ghostPad.Pad) {
-		return nil, ErrGhostPadFailed
+	if isPlaylist {
+		// create ghost pads - separate video and audio for playlist
+		videoGhostPad := gst.NewGhostPad("video", videoQueue.GetStaticPad("src"))
+		if !bin.AddPad(videoGhostPad.Pad) {
+			return nil, ErrGhostPadFailed
+		}
+		audioGhostPad := gst.NewGhostPad("audio", audioQueue.GetStaticPad("src"))
+		if !bin.AddPad(audioGhostPad.Pad) {
+			return nil, ErrGhostPadFailed
+		}
+	} else {
+		// add mux to bin if one was set
+		if mux != nil {
+			err = bin.AddMany(
+				// mux
+				mux,
+			)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		// create ghost pad - single src for non-playlist
+		ghostPad := gst.NewGhostPad("src", mux.GetStaticPad("src"))
+		if !bin.AddPad(ghostPad.Pad) {
+			return nil, ErrGhostPadFailed
+		}
 	}
 
 	return &InputBin{
 		isStream:      isStream,
+		isPlaylist:    isPlaylist,
 		bin:           bin,
 		audioElements: []*gst.Element{pulseSrc, audioConvert, audioCapsFilter, faac, audioQueue},
 		videoElements: []*gst.Element{xImageSrc, videoConvert, framerateCaps, x264Enc, profileCaps, videoQueue},
@@ -180,19 +205,21 @@ func (b *InputBin) Link() error {
 	}
 
 	// link audio and video queues to mux
-	var muxAudioPad, muxVideoPad *gst.Pad
-	if b.isStream {
-		muxAudioPad = b.mux.GetRequestPad("audio")
-		muxVideoPad = b.mux.GetRequestPad("video")
-	} else {
-		muxAudioPad = b.mux.GetRequestPad("audio_%u")
-		muxVideoPad = b.mux.GetRequestPad("video_%u")
-	}
-	if err := requireLink(b.audioQueue.GetStaticPad("src"), muxAudioPad); err != nil {
-		return err
-	}
-	if err := requireLink(b.videoQueue.GetStaticPad("src"), muxVideoPad); err != nil {
-		return err
+	var audioPad, videoPad *gst.Pad
+	if !b.isPlaylist {
+		if b.isStream {
+			audioPad = b.mux.GetRequestPad("audio")
+			videoPad = b.mux.GetRequestPad("video")
+		} else {
+			audioPad = b.mux.GetRequestPad("audio_%u")
+			videoPad = b.mux.GetRequestPad("video_%u")
+		}
+		if err := requireLink(b.audioQueue.GetStaticPad("src"), audioPad); err != nil {
+			return err
+		}
+		if err := requireLink(b.videoQueue.GetStaticPad("src"), videoPad); err != nil {
+			return err
+		}
 	}
 	return nil
 }

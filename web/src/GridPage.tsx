@@ -65,23 +65,32 @@ const renderStage: React.FC<StageProps> = ({ roomState }: StageProps) => {
       if (participant instanceof RemoteParticipant && !newParticipants.includes(participant)) {
         newParticipants.push(participants[i]);
       }
-      // max of 3x3 grid
-      if (newParticipants.length > 9) {
+      // max of 6x6 grid
+      if (newParticipants.length > 36) {
         return;
       }
     }
-    if (newParticipants.length >= 9) {
+    if (newParticipants.length >= 36) {
+      setGridClass(styles.grid6x6);
+      newParticipants.splice(36, newParticipants.length - 36);
+    } else if (newParticipants.length >= 31) {
+      setGridClass(styles.grid6x6);
+    } else if (newParticipants.length >= 26) {
+      setGridClass(styles.grid6x5);
+    } else if (newParticipants.length >= 21) {
+      setGridClass(styles.grid5x5);
+    } else if (newParticipants.length >= 17) {
+      setGridClass(styles.grid5x4);
+    } else if (newParticipants.length >= 13) {
+      setGridClass(styles.grid4x4);
+    } else if (newParticipants.length >= 10) {
+      setGridClass(styles.grid4x3);
+    } else if (newParticipants.length >= 7) {
       setGridClass(styles.grid3x3);
-      newParticipants.splice(9, newParticipants.length - 9);
-    } else if (newParticipants.length >= 6) {
-      setGridClass(styles.grid3x3);
-      // one empty row
-    } else if (newParticipants.length >= 4) {
+    } else if (newParticipants.length >= 5) {
+      setGridClass(styles.grid3x2);
+    } else if (newParticipants.length >= 3) {
       setGridClass(styles.grid2x2);
-      newParticipants.splice(4, newParticipants.length - 4);
-    } else if (newParticipants.length === 3) {
-      setGridClass(styles.grid2x2);
-      // one empty spot
     } else if (newParticipants.length === 2) {
       setGridClass(styles.grid2x1);
     } else if (newParticipants.length === 1) {
@@ -116,6 +125,7 @@ const renderStage: React.FC<StageProps> = ({ roomState }: StageProps) => {
           width="100%"
           height="100%"
           adaptiveVideo
+          showOverlay
         />
       ))}
       {audioRenderers}
